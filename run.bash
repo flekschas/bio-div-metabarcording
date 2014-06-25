@@ -9,11 +9,22 @@ BASE="/Users/Fritz/Documents/Studium/BioInformatik/Master/Module/Biodiversity an
 BLAST="../blast"
 DATA="../data"
 EXTRAS="extras"
+SCRIPTS="scripts"
+
+# BLAST Database
+# Please specify the file name of your FASTA file, that is contained in the
+# $BLAST directory specified above, which should be turned into a BLAST DB.
+BLASTDB="LSURef_115_tax_silva.fasta"
+
+# Extra files
+# Please make sure that all files listed below are within the $EXTRA directory
+BARCODES="barcodes.csv"
+PRIMER="primer.fa"
 
 # Applications
 FASTXBCS="fastx_barcode_splitter.pl"
 MAKEBLASTDB="makeblastdb"
-SFF4FASTQ="/Applications/Bioinformatics/sff2fastq"
+SFF4FASTQ="sff2fastq"
 TRIMMOMATIC="/Applications/trimmomatic-0.32/trimmomatic-0.32.jar"
 
 # Application parameters
@@ -35,6 +46,46 @@ TRIM_WIN_Q=14
 # Remove reads which are shorter than the given number of bases
 TRIM_MIN_LEN=20
 
+# Number of sub-samples
+SUBSAMPLES=500
+
+
+
+# Parameters
+# ------------------------------------------------------------------------------
+# Set your configs
+CLEAR=false
+
+while getopts ":hcs:" opt; do
+    case $opt in
+    h)
+        echo ""
+        echo "USAGE:   run.bash [<options>]"
+        echo ""
+        echo "OPTIONS: -h    Show help"
+        echo "         -c    Clear/override old intermediate files"
+        echo "         -s    Number of sum-samples used for BLASTing"
+        echo ""
+        exit 0
+        ;;
+    c)
+        CLEAR=true
+        ;;
+    s)
+        SUBSAMPLES=$OPTARG
+        ;;
+    \?)
+        echo "Invalid option: -$OPTARG" >&2
+        ;;
+    :)
+        echo "Option -$OPTARG requires an argument." >&2
+        exit 1
+        ;;
+  esac
+done
+
+
+
 # Tests and Preperation
 # ------------------------------------------------------------------------------
 # Set your configs
@@ -50,16 +101,19 @@ cd "$BASE/$BLAST"
 
 # If the BLAST DB does not exist, create it
 
-[[ -f "LSURef_115_tax_silva.fasta.nhr" && \
-   -f "LSURef_115_tax_silva.fasta.nin" && \
-   -f "LSURef_115_tax_silva.fasta.nsq" ]] || \
-$MAKEBLASTDB -in ./LSURef_115_tax_silva.fasta -dbtype nucl
+[[ -f "$BLASTDB.nhr" && \
+   -f "$BLASTDB.nin" && \
+   -f "$BLASTDB.nsq" ]] || \
+$MAKEBLASTDB -in $BLASTDB -dbtype nucl
 
 
 
 # Prepare reads
 # ------------------------------------------------------------------------------
-# 
+# 1. Convert SFF to FASTQ
+# 2. Demultiplex reads
+# 3. Remove primer, barcodes and bases with a low quality
+# 4. Sub-sample reads
 
 cd "$BASE/$DATA"
 
@@ -76,7 +130,7 @@ done
 mkdir -p demultiplexed
 
 # Demultiplex all reads at once
-cat *.fq | $FASTXBCS --bcfile "$BASE/$EXTRAS/barcodes.csv" \
+cat *.fq | $FASTXBCS --bcfile "$BASE/$EXTRAS/$BARCODES" \
 --prefix "demultiplexed/" --bol --mismatches $DEMUXMM --suffix ".fq" \
 > "$BASE/logs/demultiplexing.log"
 
@@ -85,6 +139,7 @@ cat *.fq | $FASTXBCS --bcfile "$BASE/$EXTRAS/barcodes.csv" \
 [ -f .fq ] && rm .fq
 
 mkdir -p trimmed
+mkdir -p subsamples
 
 # Remove barcode, primer and bases with too low quality
 for FQ in demultiplexed/*.fq;
@@ -96,15 +151,30 @@ do
     -trimlog "$BASE/logs/trimmomatic.$FILENAME.log" \
     $FQ "trimmed/$FILENAME.fq" \
     HEADCROP:$TRIM_BC_LEN \
-    ILLUMINACLIP:"$BASE/$EXTRAS/primer.fa":2:30:10 \
+    ILLUMINACLIP:"$BASE/$EXTRAS/$PRIMER":2:30:10 \
     LEADING:$TRIM_LEAD_Q TRAILING:$TRIM_TRAIL_Q \
     SLIDINGWINDOW:$TRIM_WIN_LEN:$TRIM_WIN_Q MINLEN:$TRIM_MIN_LEN
+
+    # Sub-sample reads
+    "$BASE/$SCRIPTS" "trimmed/$FILENAME.fq" "subsamples/$FILENAME.fq" $SUBSAMPLES
 done
+
 
 
 # BLAST reads
 # ------------------------------------------------------------------------------
-# 
+#
 
-# awk 'BEGIN{P=1}{if(P==1||P==2){gsub(/^[@]/,">");print}; if(P==4)P=0; P++}' "$FILENAME.fq" \
-# blastn -db blast/LSURef_115_tax_silva -out blast/hits.txt -query - -outfmt 6
+cd "$BASE/$BLAST"
+
+mkdir -p hits
+
+for FQ in "$BASE/$DATA/subsamples/"*.fq;
+do
+    # Extract file name
+    FILENAME=$(echo "${FQ}" | perl -nle 'm/([^\/]+)\.fq$/; print $1')
+
+    # Convert FASTQ to FASTA on the fly and BLAST the reads against the BLAST DB
+    awk 'BEGIN{P=1}{if(P==1||P==2){gsub(/^[@]/,">");print}; if(P==4)P=0; P++}' $FQ \
+    blastn -db $BLASTDB -out hits/$FILENAME.txt -query - -outfmt 6
+done
