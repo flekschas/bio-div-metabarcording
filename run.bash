@@ -53,8 +53,9 @@ SUBSAMPLES=500
 
 # Parameters
 # ------------------------------------------------------------------------------
-# Set your configs
-CLEAR=false
+# See usage to get an overview of all parameters
+
+CACHE=false
 
 while getopts ":hcs:" opt; do
     case $opt in
@@ -63,13 +64,13 @@ while getopts ":hcs:" opt; do
         echo "USAGE:   run.bash [<options>]"
         echo ""
         echo "OPTIONS: -h    Show help"
-        echo "         -c    Clear/override old intermediate files"
+        echo "         -c    Use cached files if available (much faster)"
         echo "         -s    Number of sum-samples used for BLASTing"
         echo ""
         exit 0
         ;;
     c)
-        CLEAR=true
+        CACHE=true
         ;;
     s)
         SUBSAMPLES=$OPTARG
@@ -103,7 +104,8 @@ cd "$BASE/$BLAST"
 
 [[ -f "$BLASTDB.nhr" && \
    -f "$BLASTDB.nin" && \
-   -f "$BLASTDB.nsq" ]] || \
+   -f "$BLASTDB.nsq" && \
+   $CACHE ]] || \
 $MAKEBLASTDB -in $BLASTDB -dbtype nucl
 
 
@@ -123,12 +125,17 @@ do
     FILENAME=$(echo "${SFF}" | perl -nle 'm/([^\/]+)\.sff$/; print $1')
 
     # Convert SFF to FASTQ if not already done
-    [ -f "$FILENAME.fq" ] || \
+    [[ -f "$FILENAME.fq" && $CACHE ]] || \
     "$BASE/$SFF4FASTQ" $SFF > "$FILENAME.fq"
 done
 
 mkdir -p demultiplexed
 
+# # Test if reads are already demultiplexed
+# if [];
+# then
+
+# fi
 # Demultiplex all reads at once
 cat *.fq | $FASTXBCS --bcfile "$BASE/$EXTRAS/$BARCODES" \
 --prefix "demultiplexed/" --bol --mismatches $DEMUXMM --suffix ".fq" \
@@ -147,6 +154,7 @@ do
     # Extract file name
     FILENAME=$(echo "${FQ}" | perl -nle 'm/([^\/]+)\.fq$/; print $1')
 
+    [[ -f "trimmed/$FILENAME.fq" && $CACHE ]] || \
     java -jar "$TRIMMOMATIC" SE -phred33 \
     -trimlog "$BASE/logs/trimmomatic.$FILENAME.log" \
     $FQ "trimmed/$FILENAME.fq" \
@@ -156,7 +164,9 @@ do
     SLIDINGWINDOW:$TRIM_WIN_LEN:$TRIM_WIN_Q MINLEN:$TRIM_MIN_LEN
 
     # Sub-sample reads
-    "$BASE/$SCRIPTS" "trimmed/$FILENAME.fq" "subsamples/$FILENAME.fq" $SUBSAMPLES
+    [[ -f "subsamples/$FILENAME.fq" || $CACHE ]] || \
+    "$BASE/$SCRIPTS/subsample_se_fastq.bash" "trimmed/$FILENAME.fq" \
+    "subsamples/$FILENAME.fq" $SUBSAMPLES
 done
 
 
@@ -175,6 +185,6 @@ do
     FILENAME=$(echo "${FQ}" | perl -nle 'm/([^\/]+)\.fq$/; print $1')
 
     # Convert FASTQ to FASTA on the fly and BLAST the reads against the BLAST DB
-    awk 'BEGIN{P=1}{if(P==1||P==2){gsub(/^[@]/,">");print}; if(P==4)P=0; P++}' $FQ \
+    awk 'BEGIN{P=1}{if(P==1||P==2){gsub(/^[@]/,">");print}; if(P==4)P=0; P++}' "$FQ" | \
     blastn -db $BLASTDB -out hits/$FILENAME.txt -query - -outfmt 6
 done
