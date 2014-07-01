@@ -10,6 +10,7 @@ BLAST="../blast"
 DATA="../data"
 EXTRAS="extras"
 SCRIPTS="scripts"
+UPARSE="../uparse"
 
 # BLAST Database
 # Please specify the file name of your FASTA file, that is contained in the
@@ -22,10 +23,12 @@ BARCODES="barcodes.csv"
 PRIMER="primer.fa"
 
 # Applications
+# These should be absolute paths!
 FASTXBCS="fastx_barcode_splitter.pl"
 MAKEBLASTDB="makeblastdb"
 SFF4FASTQ="sff2fastq"
 TRIMMOMATIC="/Applications/trimmomatic-0.32/trimmomatic-0.32.jar"
+USEARCH="usearch"
 
 # Application parameters
 # Number of mismatches for demultiplexing
@@ -119,6 +122,8 @@ $MAKEBLASTDB -in $BLASTDB -dbtype nucl
 
 cd "$BASE/$DATA"
 
+echo "Convert SFF to FASTQ"
+
 for SFF in *.sff;
 do
     # Extract file name
@@ -136,6 +141,9 @@ mkdir -p demultiplexed
 # then
 
 # fi
+
+echo "Demultiplex reads"
+
 # Demultiplex all reads at once
 cat *.fq | $FASTXBCS --bcfile "$BASE/$EXTRAS/$BARCODES" \
 --prefix "demultiplexed/" --bol --mismatches $DEMUXMM --suffix ".fq" \
@@ -147,6 +155,8 @@ cat *.fq | $FASTXBCS --bcfile "$BASE/$EXTRAS/$BARCODES" \
 
 mkdir -p trimmed
 mkdir -p subsamples
+
+echo "Trim and subsample reads"
 
 # Remove barcode, primer and bases with too low quality
 for FQ in demultiplexed/*.fq;
@@ -179,12 +189,39 @@ cd "$BASE/$BLAST"
 
 mkdir -p hits
 
+printf "BLAST: "
+
 for FQ in "$BASE/$DATA/subsamples/"*.fq;
 do
     # Extract file name
-    FILENAME=$(echo "${FQ}" | perl -nle 'm/([^\/]+)\.fq$/; print $1')
+    FILENAME=$(echo "${FQ}" | perl -nle 'm/([^\/_]+)(_[0-9]+)*\.fq$/; print $1')
+
+    printf "$FILENAME... "
 
     # Convert FASTQ to FASTA on the fly and BLAST the reads against the BLAST DB
-    awk 'BEGIN{P=1}{if(P==1||P==2){gsub(/^[@]/,">");print}; if(P==4)P=0; P++}' "$FQ" | \
-    blastn -db $BLASTDB -out hits/$FILENAME.txt -query - -outfmt 6
+    cat "$BASE/$DATA/subsamples/$FILENAME"*.fq | \
+    awk 'BEGIN{P=1}{if(P==1||P==2){gsub(/^[@]/,">");print}; if(P==4)P=0; P++}' - | \
+    blastn -db $BLASTDB -out hits/$FILENAME.xml -query - -outfmt 5
 done
+
+echo ""
+
+
+
+# # BLAST reads
+# # ------------------------------------------------------------------------------
+# #
+
+# cd "$BASE/$UPARSE"
+
+# mkdir -p sorted
+
+# for FQ in "$BASE/$DATA/trimmed/"*.fq;
+# do
+#     # Extract file name WITHOUT _[number].fq
+#     FILENAME=$(echo "${FQ}" | perl -nle 'm/([^\/_]+)(_[0-9]+)*\.fq$/; print $1')
+
+
+
+#     $USEARCH -sortbysize seqs.fasta -output seqs_sorted.fasta -minsize 4
+# done
