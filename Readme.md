@@ -41,7 +41,20 @@ in the *config* section according to your systems settings.
 
 ## Execution
 
-After you have set up everything as explained above then your can run the
-analysis by simple executing the `run.bash` script.
+After you have set up everything as explained above you can run the analysis
+by simple executing `run.bash`.
 
 `./run.bash`
+
+## Visualise BLAST results
+
+An easy way to visalise BLAST hits is to import them into [MEGAN](http://ab.inf.uni-tuebingen.de/software/megan/).
+Make sure to specify the right taxonomy try via
+`Edit > Preferences > Use alternative taxonomy` and loading the synonyms file
+if you BLASTed against something other than NCBI. To generate a neat heat map
+follow the steps:
+
+1. Import BLAST hits into MEGAN.
+2. After setting the LCA parameters select the leaves for which you want to generate a plot.
+3. Export the plots as a DSV file using `taxa-name, counts` and `tab` separation.
+4. Prepare the exported file using `scripts/prepare_megan_exports.bash`
