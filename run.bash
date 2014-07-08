@@ -32,7 +32,7 @@ USEARCH="usearch"
 
 # Application parameters
 # Number of mismatches for demultiplexing
-DEMUXMM=1
+DEMUXMM=0
 # Trimmomatic settings
 # Barcode length will simply be cutted from the beginning
 TRIM_BC_LEN=10
@@ -57,6 +57,9 @@ NUM_THREADS=4
 
 # Fixed read length for uparse
 UPARSE_READ_LEN=300
+
+# Uparse dereplication minsize
+MINSIZE=5
 
 
 
@@ -304,6 +307,7 @@ echo ""
 cd "$BASE/$DATA"
 
 # Trim reads to a fixed length and convert FASTQ to FASTA
+[[ -f "$DATA/$UPARSE/all.fa" && $CACHE = true ]] || \
 cat trimmed/*.fq | \
 "$BASE/$SCRIPTS/trim.py" $UPARSE_READ_LEN | \
 awk 'BEGIN{P=1}{if(P==1||P==2){gsub(/^[@]/,">");print}; if(P==4)P=0; P++}' - \
@@ -314,17 +318,22 @@ cd "$DATA/$UPARSE"
 mkdir -p otus
 
 # Dereplicate rads
-$USEARCH -derep_fulllength all.fa -sizeout -output all.derep.fa
+# [[ -f all.derep.fa && $CACHE = true ]] || \
+$USEARCH -derep_fulllength all.fa -output all.derep.fa -sizeout
 
 # Sort reads by size and throw away everything that's smaller than 2
-$USEARCH -sortbysize all.derep.fa -minsize 2 -output all.sorted.fa
+# [[ -f all.sorted.fa && $CACHE = true ]] || \
+$USEARCH -sortbysize all.derep.fa -minsize $MINSIZE -output all.sorted.fa
 
 # Cluster OTUs
+# [[ -f otus/otus.fa && $CACHE = true ]] || \
 $USEARCH -cluster_otus all.sorted.fa -otus otus/otus.fa
 
 # Remove chimera
-$USEARCH -uchime_ref otus/otus.fa -otus otus.fa -db "$BASE/$BLAST/$BLASTDB" -strand plus -nonchimeras otus/otus.no_chimaras.fa
+# [[ -f otus/otus.no_chimaras.fa && $CACHE = true ]] || \
+$USEARCH -uchime_ref otus/otus.fa -db "$BASE/$BLAST/$BLASTDB" -strand plus -nonchimeras otus/otus.no_chimaras.fa
 
+# [[ -f otus/otus.numbered.fa && $CACHE = true ]] || \
 "$BASE/$SCRIPTS/usearch/fasta_number.py" otus/otus.no_chimaras.fa OTU_ > otus/otus.numbered.fa
 
 # Map reads back to the OTUs
@@ -332,12 +341,12 @@ for FQ in "$BASE/$DATA/trimmed/"*.fq
 do
     FILENAME=$(echo "${FQ}" | perl -nle 'm/([^\/]+)\.fq$/; print $1')
 
-    "$BASE/$SCRIPTS/trim.py" $UPARSE_READ_LEN < $FQ | \
+    "$BASE/$SCRIPTS/trim.py" $UPARSE_READ_LEN < "$FQ" | \
     awk 'BEGIN{P=1}{if(P==1||P==2){gsub(/^[@]/,">");print}; if(P==4)P=0; P++}' - \
     > "$BASE/$DATA/trimmed/$FILENAME.fa"
 
     # Map reads (including singletons) back to OTUs
-    $USEARCH -usearch_global "$BASE/$DATA/trimmed/$FILENAME.fa" -db otus/otus.numbered.fa -strand plus -id 0.97 -uc otus/$FILENAME.uc
+    $USEARCH -usearch_global "$BASE/$DATA/trimmed/$FILENAME.fa" -db otus/otus.numbered.fa -strand plus -id 0.97 -uc otus/$FILENAME.uc > "$BASE/logs/usearch.log"
 
     # Create OTU table
     "$BASE/$SCRIPTS/usearch/uc2otutab.py" otus/$FILENAME.uc > otus/$FILENAME.txt

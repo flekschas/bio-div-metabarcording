@@ -107,12 +107,23 @@ res <- tryCatch({
   euclid_dend <- as.dendrogram(data.euclid.fit) # get ordering for heatmap
   data.pv_fit <- pvclust(data, method.hclust="complete", method.dist="euclidian", n=1000) # in this case no transform is need
   my_colours <- brewer.pal(8,opt$color)
-  png(file=paste(opt$output, "/", args[1], ".png", sep=""), width=opt$width, height=opt$height, bg="transparent")
+  png(file=paste(opt$output, "/", args[1], "_heatmap.png", sep=""), width=opt$width, height=opt$height, bg="transparent")
   heatmap.2(as.matrix(data), margin=c(10,10), 
                              col=my_colours, 
                              Colv=euclid_dend, 
                              trace="none", 
                              denscol="black")
+  
+  my_colours <- c("#73e5ac", "#70d3b3", "#ff4119", "#6dc1ba", "#6cb8be", "#6aafc1", "#69a6c5", "#679dc8", "#6694cc")
+  
+  png(file=paste(opt$output, "/", args[1], "_barplot_abs.png", sep=""), width=opt$width, height=opt$height, bg="transparent")
+  par(mfrow=c(1, 1), mar=c(5, 5, 4, 10))
+  barplot(as.matrix(dataRel), col=my_colours, main="Absolute dominance of fungi in eukaryotes", legend = rownames(dataRel), xlab="Habitats", ylab="Percentage of reads", args.legend = list(x = "topright", bty = "n", inset=c(-0.325, 0.25)), cex.lab=1.66, cex.axis=1.33, cex.main=2)
+
+  dataRel <- t(t(data)/colSums(data))
+  png(file=paste(opt$output, "/", args[1], "_barplot_rel.png", sep=""), width=opt$width, height=opt$height, bg="transparent")
+  par(mfrow=c(1, 1), mar=c(5, 5, 4, 10))
+  barplot(as.matrix(dataRel), col=my_colours, main="Relative dominance of fungi in eukaryotes", legend = rownames(dataRel), xlab="Habitats", ylab="Percentage of reads", args.legend = list(x = "topright", bty = "n", inset=c(-0.325, 0.25)), cex.lab=1.66, cex.axis=1.33, cex.main=2)
   dev.off()
 }, warning = function(w) {
   message(paste("Download GEO Series does not seem to exist:", args[1]))

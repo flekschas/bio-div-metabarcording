@@ -1,6 +1,6 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # Like fastq_strip_barcode_relabel except:
-#	relabels with barcode label instead of barcode sequence.
+#   relabels with barcode label instead of barcode sequence.
 # Expect seq = <barcode><primer><gene>
 # Allow 2 mismatches with primer
 # Allow 0 mismatches with barcode
@@ -28,41 +28,41 @@ PL = len(Primer)
 Barcodes = fasta.ReadSeqsDict(BarcodeFileName)
 
 def MatchesPrimer(Seq, Primer):
-	return primer.MatchPrefix(Seq, Primer)
+    return primer.MatchPrefix(Seq, Primer)
 
 def FindBarcode(Seq):
-	global Barcodes
-	for BarcodeLabel in Barcodes.keys():
-		Barcode = Barcodes[BarcodeLabel]
-#		print ""
-#		print " BC", Barcode
-#		print "Seq", Seq
-		if Seq.startswith(Barcode):
-#			print "+++++++++++++++++++++"
-			return Barcode, BarcodeLabel
-	return "", ""
-	
+    global Barcodes
+    for BarcodeLabel in Barcodes.keys():
+        Barcode = Barcodes[BarcodeLabel]
+#       print ""
+#       print " BC", Barcode
+#       print "Seq", Seq
+        if Seq.startswith(Barcode):
+#           print "+++++++++++++++++++++"
+            return Barcode, BarcodeLabel
+    return "", ""
+
 def OnRec(Label, Seq, Qual):
-	global PL, LabelPrefix, Barcode, SeqCount, OutCount, BarcodeMismatchCount, PrimerMismatchCount
+    global PL, LabelPrefix, Barcode, SeqCount, OutCount, BarcodeMismatchCount, PrimerMismatchCount
 
-	SeqCount += 1
-	Barcode, BarcodeLabel = FindBarcode(Seq)
-	if Barcode == "":
-		BarcodeMismatchCount += 1
-		return
+    SeqCount += 1
+    Barcode, BarcodeLabel = FindBarcode(Seq)
+    if Barcode == "":
+        BarcodeMismatchCount += 1
+        return
 
-	BarcodeLength = len(Barcode)
-	Seq = Seq[BarcodeLength:]
-	Qual = Qual[BarcodeLength:]
+    BarcodeLength = len(Barcode)
+    Seq = Seq[BarcodeLength:]
+    Qual = Qual[BarcodeLength:]
 
-	Diffs = MatchesPrimer(Seq, Primer)
-	if Diffs > MAX_PRIMER_MISMATCHES:
-		PrimerMismatchCount += 1
-		return
+    Diffs = MatchesPrimer(Seq, Primer)
+    if Diffs > MAX_PRIMER_MISMATCHES:
+        PrimerMismatchCount += 1
+        return
 
-	OutCount += 1
-	Label = LabelPrefix + str(OutCount) + ";barcodelabel=" + BarcodeLabel + ";"
-	fastq.WriteRec(sys.stdout, Label, Seq[PL:], Qual[PL:])
+    OutCount += 1
+    Label = LabelPrefix + str(OutCount) + ";barcodelabel=" + BarcodeLabel + ";"
+    fastq.WriteRec(sys.stdout, Label, Seq[PL:], Qual[PL:])
 
 fastq.ReadRecs(FileName, OnRec)
 
