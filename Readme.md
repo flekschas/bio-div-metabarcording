@@ -1,9 +1,12 @@
-# Readme
+# Biodiversity and Evolution - Analyse biodiversity by metabarcoding using NGS data
 
 ## Introduction
 
-This tool prepares READS coming from 454 and BLASTs them against a custom
-database.
+Environmental Metagenomics: Metabarcoding and Microbes at Lake Gollin. This tool prepares READS coming from 454 and BLASTs them against a custom database.
+
+**Presentation:**
+
+[speakerdeck.com/flekschas/biodiversity-and-evolution-metabarcoding](https://speakerdeck.com/flekschas/biodiversity-and-evolution-metabarcoding)
 
 ## Requirements
 
@@ -18,16 +21,22 @@ The tool runs on Linux and Mac and requires the following tools.
 
 Clone the repository to your favourite location, e.g. `/my/fav/location`:
 
-`git clone https://bitbucket.org/flekschas/biodivex2 /my/fav/location`
+```
+git clone https://github.com/flekschas/bio-div-metabarcording
+```
 
 The change the directory to `/my/fav/location`:
 
-`cd /my/fav/location`
+```
+cd /my/fav/location
+```
 
 Make the main `run.bash` and all scripts contain in `scripts` executable:
 
-`chmod +x ./run.bash`
-`chmod +x scripts/*.bash`
+```
+chmod +x ./run.bash
+chmod +x scripts/*.bash
+```
 
 Now you have to copy/move your `.SFF` of interest into the `data` folder.
 
@@ -44,7 +53,9 @@ in the *config* section according to your systems settings.
 After you have set up everything as explained above you can run the analysis
 by simple executing `run.bash`.
 
-`./run.bash`
+```
+./run.bash
+```
 
 ## Visualise BLAST results
 
@@ -58,3 +69,7 @@ follow the steps:
 2. After setting the LCA parameters select the leaves for which you want to generate a plot.
 3. Export the plots as a DSV file using `taxa-name, counts` and `tab` separation.
 4. Prepare the exported file using `scripts/prepare_megan_exports.bash`
+
+### Authors
+
+Fritz Lekschas, Annkatrin Bressin, Melanie Liedtke, Nina Kersten
